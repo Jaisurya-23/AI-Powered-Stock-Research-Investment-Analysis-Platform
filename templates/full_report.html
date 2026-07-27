@@ -1,0 +1,405 @@
+{# ============================================================
+   full_report.html
+   Polished, structured "Full Report" view.
+   Included from report.html - expects these vars in context:
+     company, ticker, created_at, financial_data, news_data,
+     checklist_data, ai_report
+   financial_data / news_data / checklist_data are the raw dicts
+   returned by fetch_enhanced_financial_data(), fetch_advanced_news(),
+   and perform_intelligent_evaluation() respectively.
+   ============================================================ #}
+
+{% set data = financial_data.data %}
+{% set quality = financial_data.quality_score %}
+{% set verdict = checklist_data.verdict %}
+{% set rating_upper = verdict.rating|upper %}
+{% set verdict_color = 'success' if ('BUY' in rating_upper and 'SELL' not in rating_upper) else ('danger' if 'SELL' in rating_upper else ('warning' if 'HOLD' in rating_upper else 'secondary')) %}
+{% set quality_color = 'success' if quality.rating in ['Excellent','Good'] else ('warning' if quality.rating == 'Average' else 'danger') %}
+
+<div class="full-report">
+
+  <!-- ============ HERO / HEADER ============ -->
+  <div class="fr-hero mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div class="fr-eyebrow">AI-Powered Comprehensive Stock Research Report</div>
+        <h2 class="fr-company-name mb-1">{{ data.basic_info.company_name }}</h2>
+        <div class="text-muted">
+          <span class="fw-semibold">{{ ticker }}</span>
+          &nbsp;•&nbsp; {{ data.basic_info.sector }} / {{ data.basic_info.industry }}
+          &nbsp;•&nbsp; {{ data.basic_info.country }}
+        </div>
+      </div>
+      <div class="text-md-end">
+        <span class="badge bg-{{ verdict_color }} fr-verdict-badge">{{ verdict.rating }}</span>
+        <div class="text-muted small mt-1">Generated {{ created_at }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EXECUTIVE SUMMARY STAT ROW ============ -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="fr-stat-card">
+        <div class="fr-stat-label"><i class="fas fa-trophy text-warning me-1"></i>Investment Score</div>
+        <div class="fr-stat-value">{{ checklist_data.total_score }}<span class="fr-stat-suffix">/100</span></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fr-stat-card">
+        <div class="fr-stat-label"><i class="fas fa-star text-{{ quality_color }} me-1"></i>Quality Rating</div>
+        <div class="fr-stat-value fs-4 text-{{ quality_color }}">{{ quality.rating }}</div>
+        <div class="text-muted small">{{ quality.percentage }}%</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fr-stat-card">
+        <div class="fr-stat-label"><i class="fas fa-shield-alt text-danger me-1"></i>Risk Level</div>
+        <div class="fr-stat-value fs-5">{{ verdict.risk_level }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fr-stat-card">
+        <div class="fr-stat-label"><i class="fas fa-bullseye text-primary me-1"></i>Current / Target</div>
+        <div class="fr-stat-value fs-5">
+          {{ data.price_analysis.current_price }} <i class="fas fa-arrow-right small text-muted mx-1"></i> {{ data.peer_comparison.target_price }}
+          <span class="fr-stat-suffix">{{ data.basic_info.currency }}</span>
+        </div>
+        {% if data.price_analysis.current_price and data.peer_comparison.target_price %}
+          {% set upside = ((data.peer_comparison.target_price - data.price_analysis.current_price) / data.price_analysis.current_price * 100) | round(1) %}
+          <div class="small {{ 'text-success' if upside >= 0 else 'text-danger' }}">
+            {{ '+' if upside >= 0 else '' }}{{ upside }}% to target
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="fr-section-card mb-4">
+    <div class="fr-section-title"><i class="fas fa-gavel me-2"></i>Recommendation</div>
+    <p class="mb-0 fs-6">{{ verdict.recommendation }}</p>
+  </div>
+
+  <!-- ============ COMPANY SNAPSHOT ============ -->
+  <div class="fr-section-card mb-4">
+    <div class="fr-section-title"><i class="fas fa-building me-2"></i>Company Snapshot</div>
+    <div class="fr-kv-grid">
+      <div class="fr-kv"><span>Website</span><strong>{{ data.basic_info.website }}</strong></div>
+      <div class="fr-kv"><span>Employees</span><strong>{{ data.basic_info.employees }}</strong></div>
+      <div class="fr-kv"><span>Market Cap</span><strong>{{ data.basic_info.market_cap }}</strong></div>
+      <div class="fr-kv"><span>52-Week Range</span><strong>{{ data.price_analysis['52_week_low'] }} – {{ data.price_analysis['52_week_high'] }}</strong></div>
+      <div class="fr-kv"><span>Price Position</span><strong>{{ data.price_analysis.price_position_in_range }}% of range</strong></div>
+      <div class="fr-kv"><span>Beta (Volatility)</span><strong>{{ data.price_analysis.beta }}</strong></div>
+    </div>
+    {% if data.basic_info.business_summary %}
+    <p class="text-muted mt-3 mb-0 fr-business-summary">{{ data.basic_info.business_summary }}</p>
+    {% endif %}
+  </div>
+
+  <!-- ============ METRIC GRID: VALUATION / GROWTH / PROFITABILITY / HEALTH ============ -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="fr-section-card h-100">
+        <div class="fr-section-title"><i class="fas fa-calculator me-2 text-primary"></i>Valuation</div>
+        <div class="fr-kv-grid fr-kv-grid-2col">
+          <div class="fr-kv"><span>P/E Ratio</span><strong>{{ data.valuation_metrics.pe_ratio }}</strong></div>
+          <div class="fr-kv"><span>Forward P/E</span><strong>{{ data.valuation_metrics.forward_pe }}</strong></div>
+          <div class="fr-kv"><span>PEG Ratio</span><strong>{{ data.valuation_metrics.peg_ratio }}</strong></div>
+          <div class="fr-kv"><span>Price/Book</span><strong>{{ data.valuation_metrics.price_to_book }}</strong></div>
+          <div class="fr-kv"><span>Price/Sales</span><strong>{{ data.valuation_metrics.price_to_sales }}</strong></div>
+          <div class="fr-kv"><span>EV/Revenue</span><strong>{{ data.valuation_metrics.ev_to_revenue }}</strong></div>
+          <div class="fr-kv"><span>EV/EBITDA</span><strong>{{ data.valuation_metrics.ev_to_ebitda }}</strong></div>
+          <div class="fr-kv"><span>Enterprise Value</span><strong>{{ data.valuation_metrics.enterprise_value }}</strong></div>
+        </div>
+        <hr>
+        <div class="fr-kv-grid">
+          <div class="fr-kv"><span>Analyst Rec.</span><strong>{{ data.peer_comparison.recommendation }}</strong></div>
+          <div class="fr-kv"><span># Analysts</span><strong>{{ data.peer_comparison.analyst_count }}</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="fr-section-card h-100">
+        <div class="fr-section-title"><i class="fas fa-arrow-trend-up me-2 text-success"></i>Growth</div>
+        <div class="fr-kv-grid fr-kv-grid-2col">
+          <div class="fr-kv"><span>Revenue 3Y CAGR</span><strong>{{ data.growth_metrics.revenue_3y_cagr }}%</strong></div>
+          <div class="fr-kv"><span>Earnings 3Y CAGR</span><strong>{{ data.growth_metrics.earnings_3y_cagr }}%</strong></div>
+          <div class="fr-kv"><span>QoQ Revenue Gr.</span><strong>{{ data.growth_metrics.revenue_growth_qoq }}%</strong></div>
+          <div class="fr-kv"><span>QoQ Earnings Gr.</span><strong>{{ data.growth_metrics.earnings_growth_qoq }}%</strong></div>
+        </div>
+        <hr>
+        <div class="fr-kv"><span>Revenue Trend</span><strong>{{ data.growth_metrics.revenue_trend }}</strong></div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="fr-section-card h-100">
+        <div class="fr-section-title"><i class="fas fa-percent me-2 text-warning"></i>Profitability</div>
+        <div class="fr-kv-grid fr-kv-grid-2col">
+          <div class="fr-kv"><span>ROE</span><strong>{{ data.profitability_metrics.roe }}%</strong></div>
+          <div class="fr-kv"><span>ROA</span><strong>{{ data.profitability_metrics.roa }}%</strong></div>
+          <div class="fr-kv"><span>ROIC</span><strong>{{ data.profitability_metrics.roic }}%</strong></div>
+          <div class="fr-kv"><span>Profit Margin</span><strong>{{ data.profitability_metrics.profit_margin }}%</strong></div>
+          <div class="fr-kv"><span>Operating Margin</span><strong>{{ data.profitability_metrics.operating_margin }}%</strong></div>
+          <div class="fr-kv"><span>Gross Margin</span><strong>{{ data.profitability_metrics.gross_margin }}%</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="fr-section-card h-100">
+        <div class="fr-section-title"><i class="fas fa-heart-pulse me-2 text-info"></i>Financial Health & Dividend</div>
+        <div class="fr-kv-grid fr-kv-grid-2col">
+          <div class="fr-kv"><span>Current Ratio</span><strong>{{ data.financial_health.current_ratio }}</strong></div>
+          <div class="fr-kv"><span>Quick Ratio</span><strong>{{ data.financial_health.quick_ratio }}</strong></div>
+          <div class="fr-kv"><span>Debt/Equity</span><strong>{{ data.financial_health.debt_to_equity }}%</strong></div>
+          <div class="fr-kv"><span>Interest Coverage</span><strong>{{ data.financial_health.interest_coverage }}x</strong></div>
+          <div class="fr-kv"><span>Total Debt</span><strong>{{ data.financial_health.total_debt }}</strong></div>
+          <div class="fr-kv"><span>Total Cash</span><strong>{{ data.financial_health.total_cash }}</strong></div>
+          <div class="fr-kv"><span>Free Cash Flow</span><strong>{{ data.financial_health.free_cash_flow }}</strong></div>
+          <div class="fr-kv"><span>Dividend Yield</span><strong>{{ data.dividend_info.dividend_yield }}%</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ NEWS SENTIMENT ============ -->
+  <div class="fr-section-card mb-4">
+    <div class="fr-section-title"><i class="fas fa-newspaper me-2 text-secondary"></i>News Sentiment & Market Buzz</div>
+
+    {% if news_data and news_data.success %}
+      {% set s = news_data.summary %}
+      <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <span class="fr-sentiment-badge">{{ s.overall_emoji }} {{ s.overall_sentiment }}</span>
+        <span class="text-muted small">{{ s.total_articles }} articles analyzed{% if news_data.total_sources %} from {{ news_data.total_sources }} sources{% endif %}</span>
+      </div>
+
+      <div class="fr-sentiment-bar mb-3">
+        <div class="fr-sentiment-seg bg-success" style="width: {{ s.sentiment_distribution.positive_percentage }}%" title="Positive {{ s.sentiment_distribution.positive_percentage }}%"></div>
+        <div class="fr-sentiment-seg bg-secondary" style="width: {{ s.sentiment_distribution.neutral_percentage }}%" title="Neutral {{ s.sentiment_distribution.neutral_percentage }}%"></div>
+        <div class="fr-sentiment-seg bg-danger" style="width: {{ s.sentiment_distribution.negative_percentage }}%" title="Negative {{ s.sentiment_distribution.negative_percentage }}%"></div>
+      </div>
+      <div class="d-flex gap-3 small text-muted mb-3 flex-wrap">
+        <span><i class="fas fa-circle text-success me-1"></i>Positive {{ s.sentiment_distribution.positive }} ({{ s.sentiment_distribution.positive_percentage }}%)</span>
+        <span><i class="fas fa-circle text-secondary me-1"></i>Neutral {{ s.sentiment_distribution.neutral }} ({{ s.sentiment_distribution.neutral_percentage }}%)</span>
+        <span><i class="fas fa-circle text-danger me-1"></i>Negative {{ s.sentiment_distribution.negative }} ({{ s.sentiment_distribution.negative_percentage }}%)</span>
+      </div>
+
+      {% if news_data.key_themes %}
+      <div class="mb-3">
+        {% for theme in news_data.key_themes %}
+          <span class="fr-pill">{{ theme.theme }} · {{ theme.count }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if s.critical_articles %}
+      <div class="fr-subheading">Critical / High-Importance News</div>
+      <div class="fr-news-list mb-3">
+        {% for a in s.critical_articles[:5] %}
+        <div class="fr-news-item">
+          <div>{{ a.sentiment_emoji }} <span class="badge bg-dark-subtle text-dark me-1">{{ a.importance }}</span>{{ a.title }}</div>
+          <div class="text-muted small">{{ a.category }} • {{ a.source }} • {{ a.time }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if news_data.articles %}
+      <div class="fr-subheading">Recent Headlines</div>
+      <div class="fr-news-list">
+        {% for a in news_data.articles[:12] %}
+        <div class="fr-news-item">
+          <div>{{ a.sentiment_emoji }} <span class="text-muted small">[{{ a.category }}]</span> {{ a.title }}</div>
+          <div class="text-muted small">{{ a.source }} • {{ a.time }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <p class="text-muted mb-0">News data temporarily unavailable.</p>
+    {% endif %}
+  </div>
+
+  <!-- ============ CHECKLIST EVALUATION ============ -->
+  <div class="fr-section-card mb-4">
+    <div class="fr-section-title"><i class="fas fa-list-check me-2 text-primary"></i>Investment Checklist Evaluation</div>
+
+    {% for cat_key, cat_data in checklist_data.category_results.items() %}
+    {% set score_info = checklist_data.category_scores[cat_key] %}
+    <div class="fr-checklist-cat">
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div class="fw-semibold">{{ cat_data.category }}</div>
+        <div class="text-muted small">{{ score_info.score }}/100 · Weight {{ score_info.weight }}% · Contribution {{ score_info.weighted_score }} pts</div>
+      </div>
+      <div class="fr-checklist-items">
+        {% for check_name, passed, detail in cat_data.checks %}
+        <div class="fr-check-item {{ 'fr-check-pass' if passed else 'fr-check-fail' }}">
+          <i class="fas {{ 'fa-check-circle' if passed else 'fa-times-circle' }}"></i>
+          <div>
+            <div class="fw-semibold">{{ check_name }}</div>
+            <div class="text-muted small">{{ detail }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="fr-checklist-overall">
+      <div><span class="text-muted small">Overall Score</span><div class="fs-4 fw-bold">{{ checklist_data.total_score }}/100</div></div>
+      <div><span class="text-muted small">Verdict</span><div class="fw-semibold">{{ verdict.rating }}</div></div>
+      <div><span class="text-muted small">Risk</span><div class="fw-semibold">{{ verdict.risk_level }}</div></div>
+    </div>
+  </div>
+
+  <!-- ============ INSTITUTIONAL HOLDERS ============ -->
+  {% if data.institutional_holdings and data.institutional_holdings.has_data and data.institutional_holdings.top_holders %}
+  <div class="fr-section-card mb-4">
+    <div class="fr-section-title"><i class="fas fa-users me-2 text-primary"></i>Top Institutional Holders</div>
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Holder</th><th>Shares</th><th>Value</th></tr></thead>
+      <tbody>
+        {% for h in data.institutional_holdings.top_holders[:5] %}
+        <tr>
+          <td>{{ h.Holder }}</td>
+          <td>{{ h.Shares }}</td>
+          <td>{{ h.Value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ============ AI ANALYSIS ============ -->
+  <div class="fr-section-card fr-ai-section mb-4">
+    <div class="fr-section-title"><i class="fas fa-robot me-2 text-success"></i>AI-Powered Comprehensive Analysis</div>
+    <div class="fr-ai-content">{{ (ai_report or "AI analysis unavailable.")|simple_markdown }}</div>
+  </div>
+
+  <!-- ============ DISCLAIMER ============ -->
+  <div class="fr-disclaimer">
+    <i class="fas fa-info-circle me-2"></i>
+    This research report is generated using artificial intelligence and publicly available financial data.
+    It is for educational and research purposes only and does <strong>not</strong> constitute investment,
+    financial, or trading advice. Past performance does not guarantee future results; all investments carry
+    risk. Conduct your own due diligence and consult a qualified financial advisor before making decisions.
+  </div>
+
+</div>
+
+<style>
+  .full-report { font-family: inherit; color: #1f2937; }
+
+  .fr-hero {
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 24px 28px;
+  }
+  .fr-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: .72rem;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 4px;
+  }
+  .fr-company-name { font-weight: 700; }
+  .fr-verdict-badge { font-size: .95rem; padding: 8px 14px; border-radius: 999px; }
+
+  .fr-stat-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px 16px;
+    height: 100%;
+  }
+  .fr-stat-label { font-size: .78rem; color: #6b7280; margin-bottom: 4px; }
+  .fr-stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+  .fr-stat-suffix { font-size: .8rem; color: #9ca3af; font-weight: 500; }
+
+  .fr-section-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .fr-section-title {
+    font-weight: 700;
+    font-size: 1.02rem;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .fr-kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+  }
+  .fr-kv-grid-2col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 576px) {
+    .fr-kv-grid, .fr-kv-grid-2col { grid-template-columns: 1fr; }
+  }
+  .fr-kv { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; border-bottom: 1px dashed #f1f5f9; padding-bottom: 6px; }
+  .fr-kv span { color: #6b7280; }
+  .fr-kv strong { text-align: right; }
+
+  .fr-business-summary { font-size: .9rem; line-height: 1.6; }
+
+  .fr-sentiment-badge {
+    background: #f1f5f9;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: .9rem;
+  }
+  .fr-sentiment-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f1f5f9;
+  }
+  .fr-sentiment-seg { height: 100%; }
+  .fr-pill {
+    display: inline-block;
+    background: #eef2ff;
+    color: #4338ca;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: .8rem;
+    margin: 0 6px 6px 0;
+  }
+  .fr-subheading { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: #6b7280; margin: 14px 0 8px; }
+  .fr-news-list { display: flex; flex-direction: column; gap: 10px; }
+  .fr-news-item { padding: 10px 12px; background: #f8fafc; border-radius: 8px; font-size: .9rem; }
+
+  .fr-checklist-cat { margin-bottom: 18px; }
+  .fr-checklist-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+  .fr-check-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; font-size: .87rem; background: #f8fafc; }
+  .fr-check-item.fr-check-pass i { color: #16a34a; }
+  .fr-check-item.fr-check-fail i { color: #dc2626; }
+  .fr-check-item i { margin-top: 3px; }
+  .fr-checklist-overall {
+    display: flex; gap: 32px; flex-wrap: wrap;
+    margin-top: 12px; padding-top: 14px; border-top: 1px solid #f1f5f9;
+  }
+
+  .fr-ai-content p { font-size: .93rem; line-height: 1.75; margin-bottom: 12px; }
+  .fr-ai-content ul { padding-left: 20px; margin-bottom: 12px; }
+  .fr-ai-content h4, .fr-ai-content h5, .fr-ai-content h6 { font-weight: 700; }
+
+  .fr-disclaimer {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: .85rem;
+    line-height: 1.6;
+  }
+</style>
